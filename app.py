@@ -10,7 +10,9 @@ st.set_page_config(
 )
 
 st.title("⚡ Portal Runner")
-st.caption("Three forms. Three different ways to survive.")
+st.caption(
+    "Cube, Ship, and Wave. A different random course every run."
+)
 
 html = Path(__file__).with_name("game.html").read_text(
     encoding="utf-8"
