@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #090719;
+  color: white;
+  font-family: system-ui, sans-serif;
+}
+
+.wrap {
+  max-width: 600px;
+  margin: auto;
+  padding: 8px;
+}
+
+.hud {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.arena {
+  position: relative;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #100c29;
+  border: 2px solid #433878;
+  border-radius: 16px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  text-align: center;
+  background: rgba(9, 7, 25, 0.88);
+  border-radius: 16px;
+}
+
+#overlay.hidden {
+  display: none;
+}
+
+h2 {
+  color: #c4b5fd;
+  font-size: 30px;
+  margin: 8px;
+}
+
+p {
+  line-height: 1.5;
+  color: #cbd5e1;
+}
+
+button {
+  border: 0;
+  border-radius: 12px;
+  padding: 14px 20px;
+  background: #a78bfa;
+  color: #170d36;
+  font: bold 16px system-ui;
+  cursor: pointer;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.controls button {
+  flex: 1;
+}
+
+#flip {
+  background: #67e8f9;
+  color: #083344;
+}
+
+small {
+  display: block;
+  color: #94a3b8;
+  line-height: 1.6;
+  margin-top: 12px;
+}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+  <div class="hud">
+    <span id="score">Score: 0</span>
+    <span id="coins">Coins: 0</span>
+    <span id="best">Best: 0</span>
+  </div>
+
+  <div class="arena">
+    <canvas id="game" width="600" height="400"
+            tabindex="0" aria-label="Gravity Runner arena"></canvas>
+
+    <div id="overlay">
+      <h2 id="title">GRAVITY RUNNER</h2>
+      <p id="message">
+        Tap to flip between floor and ceiling.<br>
+        Avoid pink spikes. Grab gold coins.
+      </p>
+      <button id="action">Start running</button>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="flip">↕ Flip gravity</button>
+    <button id="pause">Pause</button>
+  </div>
+
+  <small>
+    iPad: tap the arena or the Flip gravity button.<br>
+    Keyboard: Space or ↑ to flip. P to pause.<br>
+    Each coin adds 50 points. Refreshing starts a new run.
+  </small>
+</div>
+
+<script>
+"use strict";
+
+const $ = id => document.getElementById(id);
+const canvas = $("game");
+const ctx = canvas.getContext("2d");
+
+const W = 600;
+const H = 400;
+const TOP = 40;
+const BOTTOM = 360;
+const R = 12;
+
+let mode = "ready";
+let player = {x: 110, y: BOTTOM - R, vy: 0, gravity: 1};
+let obstacles = [];
+let coins = [];
+let particles = [];
+
+let time = 0;
+let distance = 0;
+let coinCount = 0;
+let score = 0;
+let best = 0;
+let spawnIn = 1.8;
+let flipCooldown = 0;
+let lastSide = 1;
+let sameSideCount = 0;
+let backgroundOffset = 0;
+
+try {
+  best = Number(localStorage.getItem("gravity-runner-best")) || 0;
+} catch (_) {}
+
+$("best").textContent = "Best: " + best;
+
+function hud() {
+  $("score").textContent = "Score: " + score;
+  $("coins").textContent = "Coins: " + coinCount;
+}
+
+function showOverlay(title, message, button, action) {
+  $("title").textContent = title;
+  $("message").textContent = message;
+  $("action").textContent = button;
+  $("action").onclick = action;
+  $("overlay").classList.remove("hidden");
+}
+
+function start() {
+  player = {x: 110, y: BOTTOM - R, vy: 0, gravity: 1};
+  obstacles = [];
+  coins = [];
+  particles = [];
+
+  time = 0;
+  distance = 0;
+  coinCount = 0;
+  score = 0;
+  spawnIn = 1.8;
+  flipCooldown = 0;
+  lastSide = 1;
+  sameSideCount = 0;
+  backgroundOffset = 0;
+
+  mode = "playing";
+  $("pause").textContent = "Pause";
+  $("overlay").classList.add("hidden");
+  hud();
+}
+
+function burst(x, y, color, count = 18) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 40 + Math.random() * 150;
+
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 0.6,
+      color
+    });
+  }
+}
+
+function flip() {
+  if (mode !== "playing" || flipCooldown > 0) return;
+
+  player.gravity *= -1;
+
+  // Immediately move toward the new surface.
+  player.vy = player.gravity * 300;
+  flipCooldown = 0.14;
+
+  burst(player.x, player.y, "#67e8f9", 8);
+}
+
+function togglePause() {
+  if (mode === "playing") {
+    mode = "paused";
+    $("pause").textContent = "Resume";
+
+    showOverlay(
+      "PAUSED",
+      "Your run is waiting.",
+      "Resume",
+      togglePause
+    );
+  } else if (mode === "paused") {
+    mode = "playing";
+    $("pause").textContent = "Pause";
+    $("overlay").classList.add("hidden");
+  }
+}
+
+function end() {
+  if (mode !== "playing") return;
+
+  mode = "over";
+  burst(player.x, player.y, "#fb7185", 40);
+
+  best = Math.max(best, score);
+  $("best").textContent = "Best: " + best;
+
+  try {
+    localStorage.setItem("gravity-runner-best", String(best));
+  } catch (_) {}
+
+  showOverlay(
+    "SPIKED!",
+    "Score: " + score + " · Coins: " + coinCount,
+    "Try again",
+    start
+  );
+}
+
+function spawnObstacle(speed) {
+  let side = Math.random() < 0.5 ? -1 : 1;
+
+  // Avoid long stretches that never require a flip.
+  if (sameSideCount >= 2) side = -lastSide;
+
+  sameSideCount = side === lastSide ? sameSideCount + 1 : 1;
+  lastSide = side;
+
+  obstacles.push({
+    x: W + 40,
+    width: 46 + Math.random() * 30,
+    height: 65 + Math.random() * 45,
+    side
+  });
+
+  // Put the coin on the safe surface opposite this obstacle.
+  coins.push({
+    x: W + 65,
+    y: side === 1 ? TOP + 26 : BOTTOM - 26,
+    collected: false
+  });
+
+  // Keep enough space to cross between surfaces.
+  spawnIn = (330 + Math.random() * 90) / speed;
+}
+
+function pointInTriangle(p, a, b, c) {
+  function cross(p1, p2, p3) {
+    return (p1.x - p3.x) * (p2.y - p3.y) -
+           (p2.x - p3.x) * (p1.y - p3.y);
+  }
+
+  const d1 = cross(p, a, b);
+  const d2 = cross(p, b, c);
+  const d3 = cross(p, c, a);
+
+  const negative = d1 < 0 || d2 < 0 || d3 < 0;
+  const positive = d1 > 0 || d2 > 0 || d3 > 0;
+
+  return !(negative && positive);
+}
+
+function distanceToSegment(p, a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSquared = dx * dx + dy * dy;
+
+  const t = lengthSquared === 0 ? 0 : Math.max(
+    0,
+    Math.min(
+      1,
+      ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSquared
+    )
+  );
+
+  return Math.hypot(
+    p.x - (a.x + t * dx),
+    p.y - (a.y + t * dy)
+  );
+}
+
+function triangle(obstacle) {
+  const base = obstacle.side === 1 ? BOTTOM : TOP;
+  const tip = base - obstacle.side * obstacle.height;
+
+  return [
+    {x: obstacle.x, y: base},
+    {x: obstacle.x + obstacle.width / 2, y: tip},
+    {x: obstacle.x + obstacle.width, y: base}
+  ];
+}
+
+function hitsSpike(obstacle) {
+  const [a, b, c] = triangle(obstacle);
+
+  return pointInTriangle(player, a, b, c) ||
+    distanceToSegment(player, a, b) < R - 2 ||
+    distanceToSegment(player, b, c) < R - 2 ||
+    distanceToSegment(player, c, a) < R - 2;
+}
+
+function update(dt) {
+  if (mode === "paused") return;
+
+  for (const p of particles) {
+    p.life -= dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+  }
+  particles = particles.filter(p => p.life > 0);
+
+  if (mode !== "playing") return;
+
+  time += dt;
+  flipCooldown = Math.max(0, flipCooldown - dt);
+
+  const speed = Math.min(430, 210 + time * 3);
+  distance += speed * dt;
+  backgroundOffset = (backgroundOffset + speed * dt) % 40;
+
+  player.vy += player.gravity * 1600 * dt;
+  player.y += player.vy * dt;
+
+  if (player.y >= BOTTOM - R) {
+    player.y = BOTTOM - R;
+    player.vy = Math.min(0, player.vy);
+  }
+
+  if (player.y <= TOP + R) {
+    player.y = TOP + R;
+    player.vy = Math.max(0, player.vy);
+  }
+
+  spawnIn -= dt;
+  if (spawnIn <= 0) spawnObstacle(speed);
+
+  for (const obstacle of obstacles) {
+    obstacle.x -= speed * dt;
+
+    if (hitsSpike(obstacle)) {
+      end();
+      return;
+    }
+  }
+
+  for (const coin of coins) {
+    coin.x -= speed * dt;
+
+    if (!coin.collected &&
+        Math.hypot(coin.x - player.x, coin.y - player.y) < R + 11) {
+      coin.collected = true;
+      coinCount += 1;
+      burst(coin.x, coin.y, "#facc15");
+    }
+  }
+
+  obstacles = obstacles.filter(o => o.x + o.width > -20);
+  coins = coins.filter(c => c.x > -20 && !c.collected);
+
+  score = Math.floor(distance / 15) + coinCount * 50;
+  hud();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.strokeStyle = "#211a42";
+  ctx.lineWidth = 1;
+
+  for (let x = -backgroundOffset; x < W; x += 40) {
+    ctx.beginPath();
+    ctx.moveTo(x, TOP);
+    ctx.lineTo(x, BOTTOM);
+    ctx.stroke();
+  }
+
+  for (let y = TOP; y <= BOTTOM; y += 40) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = "#20163e";
+  ctx.fillRect(0, 0, W, TOP);
+  ctx.fillRect(0, BOTTOM, W, H - BOTTOM);
+
+  ctx.strokeStyle = "#a78bfa";
+  ctx.lineWidth = 3;
+
+  for (const y of [TOP, BOTTOM]) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+  }
+
+  for (const obstacle of obstacles) {
+    const [a, b, c] = triangle(obstacle);
+
+    ctx.fillStyle = "#be185d";
+    ctx.strokeStyle = "#fb7185";
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.lineTo(c.x, c.y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  for (const coin of coins) {
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = "#facc15";
+    ctx.fillStyle = "#facc15";
+    ctx.beginPath();
+    ctx.arc(coin.x, coin.y, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = "#854d0e";
+    ctx.font = "bold 12px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("$", coin.x, coin.y + 4);
+  }
+
+  if (mode !== "over") {
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = "#67e8f9";
+    ctx.fillStyle = "#67e8f9";
+
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = "#083344";
+    ctx.beginPath();
+    ctx.arc(player.x + 4, player.y - 3, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "#c4b5fd";
+    ctx.lineWidth = 2;
+
+    const arrowY = player.y + player.gravity * 28;
+    ctx.beginPath();
+    ctx.moveTo(player.x, arrowY - player.gravity * 8);
+    ctx.lineTo(player.x, arrowY);
+    ctx.moveTo(player.x - 4, arrowY - player.gravity * 4);
+    ctx.lineTo(player.x, arrowY);
+    ctx.lineTo(player.x + 4, arrowY - player.gravity * 4);
+    ctx.stroke();
+  }
+
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life / 0.6);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, 4, 4);
+  }
+
+  ctx.globalAlpha = 1;
+}
+
+canvas.addEventListener("pointerdown", event => {
+  event.preventDefault();
+  canvas.focus();
+  flip();
+});
+
+$("flip").onclick = flip;
+$("pause").onclick = togglePause;
+
+window.addEventListener("keydown", event => {
+  if (event.code === "Space" || event.code === "ArrowUp") {
+    event.preventDefault();
+    if (!event.repeat) flip();
+  }
+
+  if (event.code === "KeyP" && !event.repeat) {
+    togglePause();
+  }
+});
+
+window.addEventListener("blur", () => {
+  if (mode === "playing") togglePause();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && mode === "playing") togglePause();
+});
+
+$("action").onclick = start;
+
+let previous = performance.now();
+
+function frame(now) {
+  const dt = Math.min((now - previous) / 1000, 0.033);
+  previous = now;
+
+  update(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
