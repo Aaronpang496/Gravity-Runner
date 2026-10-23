@@ -9,13 +9,13 @@
 
 body {
   margin: 0;
-  background: #090719;
-  color: white;
+  background: #080b19;
+  color: #e2e8f0;
   font-family: system-ui, sans-serif;
 }
 
 .wrap {
-  max-width: 600px;
+  max-width: 640px;
   margin: auto;
   padding: 8px;
 }
@@ -23,9 +23,24 @@ body {
 .hud {
   display: flex;
   justify-content: space-between;
+  gap: 8px;
   padding: 12px 0;
   font-size: 14px;
   font-weight: bold;
+}
+
+.track {
+  height: 6px;
+  background: #263249;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+#progress {
+  height: 100%;
+  width: 0;
+  background: #67e8f9;
 }
 
 .arena {
@@ -36,9 +51,9 @@ canvas {
   display: block;
   width: 100%;
   height: auto;
-  background: #100c29;
-  border: 2px solid #433878;
-  border-radius: 16px;
+  background: #0c1228;
+  border: 2px solid #334155;
+  border-radius: 14px;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -49,12 +64,12 @@ canvas {
   inset: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  padding: 20px;
+  justify-content: center;
   text-align: center;
-  background: rgba(9, 7, 25, 0.88);
-  border-radius: 16px;
+  padding: 20px;
+  background: rgba(5, 9, 23, 0.9);
+  border-radius: 14px;
 }
 
 #overlay.hidden {
@@ -62,24 +77,27 @@ canvas {
 }
 
 h2 {
-  color: #c4b5fd;
-  font-size: 30px;
   margin: 8px;
+  color: #67e8f9;
+  font-size: 28px;
 }
 
 p {
-  line-height: 1.5;
-  color: #cbd5e1;
+  line-height: 1.6;
 }
 
 button {
   border: 0;
   border-radius: 12px;
-  padding: 14px 20px;
-  background: #a78bfa;
-  color: #170d36;
+  padding: 15px;
   font: bold 16px system-ui;
   cursor: pointer;
+  background: #67e8f9;
+  color: #083344;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .controls {
@@ -88,20 +106,30 @@ button {
   margin-top: 12px;
 }
 
-.controls button {
-  flex: 1;
+#control {
+  flex: 2;
+  min-height: 60px;
 }
 
-#flip {
-  background: #67e8f9;
-  color: #083344;
+#pause {
+  flex: 1;
+  background: #c4b5fd;
+  color: #2e1065;
+}
+
+#hint {
+  min-height: 40px;
+  padding-top: 10px;
+  color: #cbd5e1;
+  text-align: center;
+  font-size: 14px;
 }
 
 small {
   display: block;
   color: #94a3b8;
   line-height: 1.6;
-  margin-top: 12px;
+  margin-top: 8px;
 }
 </style>
 </head>
@@ -109,34 +137,42 @@ small {
 <body>
 <div class="wrap">
   <div class="hud">
-    <span id="score">Score: 0</span>
-    <span id="coins">Coins: 0</span>
-    <span id="best">Best: 0</span>
+    <span id="form">CUBE</span>
+    <span id="percent">0%</span>
+    <span id="attempt">Attempt 1</span>
+  </div>
+
+  <div class="track">
+    <div id="progress"></div>
   </div>
 
   <div class="arena">
-    <canvas id="game" width="600" height="400"
-            tabindex="0" aria-label="Gravity Runner arena"></canvas>
+    <canvas
+      id="game"
+      width="640"
+      height="400"
+      tabindex="0"
+      aria-label="Portal Runner game"
+    ></canvas>
 
     <div id="overlay">
-      <h2 id="title">GRAVITY RUNNER</h2>
-      <p id="message">
-        Tap to flip between floor and ceiling.<br>
-        Avoid pink spikes. Grab gold coins.
-      </p>
-      <button id="action">Start running</button>
+      <h2 id="title">PORTAL RUNNER</h2>
+      <p id="message"></p>
+      <button id="action">Start</button>
     </div>
   </div>
 
   <div class="controls">
-    <button id="flip">↕ Flip gravity</button>
+    <button id="control">TAP TO JUMP</button>
     <button id="pause">Pause</button>
   </div>
 
+  <div id="hint"></div>
+
   <small>
-    iPad: tap the arena or the Flip gravity button.<br>
-    Keyboard: Space or ↑ to flip. P to pause.<br>
-    Each coin adds 50 points. Refreshing starts a new run.
+    Touch the arena or use the large control button.<br>
+    Keyboard: Space or ↑. P pauses.<br>
+    Portals change your movement mode. Each retry uses the same course.
   </small>
 </div>
 
@@ -147,100 +183,182 @@ const $ = id => document.getElementById(id);
 const canvas = $("game");
 const ctx = canvas.getContext("2d");
 
-const W = 600;
+const W = 640;
 const H = 400;
 const TOP = 40;
-const BOTTOM = 360;
+const FLOOR = 360;
+const PX = 115;
 const R = 12;
+const SPEED = 220;
+const FINISH = 8000;
 
-let mode = "ready";
-let player = {x: 110, y: BOTTOM - R, vy: 0, gravity: 1};
-let obstacles = [];
-let coins = [];
+const colors = {
+  cube: "#86efac",
+  ship: "#67e8f9",
+  wave: "#f0abfc"
+};
+
+const portals = [
+  {x: 2600, mode: "ship"},
+  {x: 5200, mode: "wave"}
+];
+
+let state = "ready";
+let form = "cube";
+let player;
+let world = 0;
+let attempt = 1;
+let portalIndex = 0;
+let angle = 0;
+let held = false;
+let activePointer = null;
+let keyHeld = false;
+let trail = [];
 let particles = [];
 
-let time = 0;
-let distance = 0;
-let coinCount = 0;
-let score = 0;
-let best = 0;
-let spawnIn = 1.8;
-let flipCooldown = 0;
-let lastSide = 1;
-let sameSideCount = 0;
-let backgroundOffset = 0;
+// Original fixed level.
+const spikes = [
+  {x: 720, width: 40, height: 38},
+  {x: 1060, width: 64, height: 38},
+  {x: 1680, width: 55, height: 38},
+  {x: 2040, width: 76, height: 38},
+  {x: 2330, width: 42, height: 38}
+];
 
-try {
-  best = Number(localStorage.getItem("gravity-runner-best")) || 0;
-} catch (_) {}
+const platforms = [
+  {x: 1330, width: 140, height: 48}
+];
 
-$("best").textContent = "Best: " + best;
+// Gates have a clear opening between top and bottom walls.
+const gates = [
+  {x: 3160, width: 45, center: 200, gap: 210},
+  {x: 3630, width: 45, center: 145, gap: 190},
+  {x: 4100, width: 45, center: 245, gap: 190},
+  {x: 4570, width: 45, center: 180, gap: 200},
 
-function hud() {
-  $("score").textContent = "Score: " + score;
-  $("coins").textContent = "Coins: " + coinCount;
+  {x: 5720, width: 40, center: 200, gap: 240},
+  {x: 6190, width: 40, center: 145, gap: 210},
+  {x: 6660, width: 40, center: 245, gap: 210},
+  {x: 7130, width: 40, center: 155, gap: 210},
+  {x: 7600, width: 40, center: 220, gap: 220}
+];
+
+function clearInput() {
+  held = false;
+  keyHeld = false;
+  activePointer = null;
 }
 
-function showOverlay(title, message, button, action) {
+function updateUI() {
+  const percent = Math.min(100, Math.floor(world / FINISH * 100));
+
+  $("form").textContent = form.toUpperCase();
+  $("form").style.color = colors[form];
+  $("percent").textContent = percent + "%";
+  $("progress").style.width = percent + "%";
+  $("progress").style.background = colors[form];
+  $("attempt").textContent = "Attempt " + attempt;
+
+  if (form === "cube") {
+    $("control").textContent = "TAP TO JUMP";
+    $("hint").textContent =
+      "CUBE: tap to jump. You can land on raised platforms.";
+  } else if (form === "ship") {
+    $("control").textContent = "HOLD TO RISE";
+    $("hint").textContent =
+      "SHIP: hold to rise, release to descend. Avoid both boundaries.";
+  } else {
+    $("control").textContent = "HOLD UP · RELEASE DOWN";
+    $("hint").textContent =
+      "WAVE: hold for diagonal up, release for diagonal down.";
+  }
+}
+
+function showOverlay(title, message, label, action) {
   $("title").textContent = title;
   $("message").textContent = message;
-  $("action").textContent = button;
+  $("action").textContent = label;
   $("action").onclick = action;
   $("overlay").classList.remove("hidden");
 }
 
 function start() {
-  player = {x: 110, y: BOTTOM - R, vy: 0, gravity: 1};
-  obstacles = [];
-  coins = [];
+  world = 0;
+  portalIndex = 0;
+  form = "cube";
+  angle = 0;
+  player = {
+    y: FLOOR - R,
+    vy: 0,
+    grounded: true
+  };
+
+  clearInput();
+  trail = [];
   particles = [];
+  state = "playing";
 
-  time = 0;
-  distance = 0;
-  coinCount = 0;
-  score = 0;
-  spawnIn = 1.8;
-  flipCooldown = 0;
-  lastSide = 1;
-  sameSideCount = 0;
-  backgroundOffset = 0;
-
-  mode = "playing";
   $("pause").textContent = "Pause";
   $("overlay").classList.add("hidden");
-  hud();
+  updateUI();
 }
 
-function burst(x, y, color, count = 18) {
-  for (let i = 0; i < count; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 40 + Math.random() * 150;
+function retry() {
+  attempt += 1;
+  start();
+}
 
+function burst(x, y, color) {
+  for (let i = 0; i < 30; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const speed = 50 + Math.random() * 180;
     particles.push({
       x, y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      life: 0.6,
+      vx: Math.cos(a) * speed,
+      vy: Math.sin(a) * speed,
+      life: 0.7,
       color
     });
   }
 }
 
-function flip() {
-  if (mode !== "playing" || flipCooldown > 0) return;
+function die() {
+  if (state !== "playing") return;
 
-  player.gravity *= -1;
+  state = "over";
+  clearInput();
+  burst(PX, player.y, colors[form]);
 
-  // Immediately move toward the new surface.
-  player.vy = player.gravity * 300;
-  flipCooldown = 0.14;
+  const tip = form === "cube"
+    ? "Jump before reaching the spikes. Tap again only after landing."
+    : form === "ship"
+      ? "Use short holds and releases to control your height."
+      : "Switch direction frequently. Holding too long reaches a wall.";
 
-  burst(player.x, player.y, "#67e8f9", 8);
+  showOverlay(
+    "CRASH!",
+    Math.floor(world / FINISH * 100) + "% complete. " + tip,
+    "Retry",
+    retry
+  );
+}
+
+function win() {
+  state = "won";
+  clearInput();
+
+  showOverlay(
+    "COURSE COMPLETE!",
+    "You mastered Cube, Ship, and Wave in " + attempt + " attempt(s).",
+    "Play again",
+    retry
+  );
 }
 
 function togglePause() {
-  if (mode === "playing") {
-    mode = "paused";
+  if (state === "playing") {
+    state = "paused";
+    clearInput();
     $("pause").textContent = "Resume";
 
     showOverlay(
@@ -249,118 +367,86 @@ function togglePause() {
       "Resume",
       togglePause
     );
-  } else if (mode === "paused") {
-    mode = "playing";
+  } else if (state === "paused") {
+    state = "playing";
     $("pause").textContent = "Pause";
     $("overlay").classList.add("hidden");
   }
 }
 
-function end() {
-  if (mode !== "playing") return;
+function press() {
+  if (state !== "playing") return;
 
-  mode = "over";
-  burst(player.x, player.y, "#fb7185", 40);
+  held = true;
 
-  best = Math.max(best, score);
-  $("best").textContent = "Best: " + best;
-
-  try {
-    localStorage.setItem("gravity-runner-best", String(best));
-  } catch (_) {}
-
-  showOverlay(
-    "SPIKED!",
-    "Score: " + score + " · Coins: " + coinCount,
-    "Try again",
-    start
-  );
-}
-
-function spawnObstacle(speed) {
-  let side = Math.random() < 0.5 ? -1 : 1;
-
-  // Avoid long stretches that never require a flip.
-  if (sameSideCount >= 2) side = -lastSide;
-
-  sameSideCount = side === lastSide ? sameSideCount + 1 : 1;
-  lastSide = side;
-
-  obstacles.push({
-    x: W + 40,
-    width: 46 + Math.random() * 30,
-    height: 65 + Math.random() * 45,
-    side
-  });
-
-  // Put the coin on the safe surface opposite this obstacle.
-  coins.push({
-    x: W + 65,
-    y: side === 1 ? TOP + 26 : BOTTOM - 26,
-    collected: false
-  });
-
-  // Keep enough space to cross between surfaces.
-  spawnIn = (330 + Math.random() * 90) / speed;
-}
-
-function pointInTriangle(p, a, b, c) {
-  function cross(p1, p2, p3) {
-    return (p1.x - p3.x) * (p2.y - p3.y) -
-           (p2.x - p3.x) * (p1.y - p3.y);
+  if (form === "cube" && player.grounded) {
+    player.vy = -570;
+    player.grounded = false;
   }
+}
 
-  const d1 = cross(p, a, b);
-  const d2 = cross(p, b, c);
-  const d3 = cross(p, c, a);
+function changeForm(next) {
+  form = next;
+  player.y = 200;
+  player.vy = 0;
+  player.grounded = false;
+  trail = [];
+  burst(PX, player.y, colors[form]);
+  updateUI();
+}
 
-  const negative = d1 < 0 || d2 < 0 || d3 < 0;
-  const positive = d1 > 0 || d2 > 0 || d3 > 0;
-
-  return !(negative && positive);
+function circleRect(cx, cy, radius, x, y, width, height) {
+  const nearestX = Math.max(x, Math.min(x + width, cx));
+  const nearestY = Math.max(y, Math.min(y + height, cy));
+  return Math.hypot(cx - nearestX, cy - nearestY) < radius;
 }
 
 function distanceToSegment(p, a, b) {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
-  const lengthSquared = dx * dx + dy * dy;
-
-  const t = lengthSquared === 0 ? 0 : Math.max(
+  const squared = dx * dx + dy * dy;
+  const t = squared === 0 ? 0 : Math.max(
     0,
     Math.min(
       1,
-      ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSquared
+      ((p.x - a.x) * dx + (p.y - a.y) * dy) / squared
     )
   );
-
   return Math.hypot(
-    p.x - (a.x + t * dx),
-    p.y - (a.y + t * dy)
+    p.x - a.x - t * dx,
+    p.y - a.y - t * dy
   );
 }
 
-function triangle(obstacle) {
-  const base = obstacle.side === 1 ? BOTTOM : TOP;
-  const tip = base - obstacle.side * obstacle.height;
+function spikeHit(spike) {
+  const x = spike.x - world + PX;
+  const a = {x, y: FLOOR};
+  const b = {x: x + spike.width / 2, y: FLOOR - spike.height};
+  const c = {x: x + spike.width, y: FLOOR};
+  const p = {x: PX, y: player.y};
 
-  return [
-    {x: obstacle.x, y: base},
-    {x: obstacle.x + obstacle.width / 2, y: tip},
-    {x: obstacle.x + obstacle.width, y: base}
-  ];
-}
+  function cross(a, b, p) {
+    return (b.x - a.x) * (p.y - a.y) -
+           (b.y - a.y) * (p.x - a.x);
+  }
 
-function hitsSpike(obstacle) {
-  const [a, b, c] = triangle(obstacle);
+  const d1 = cross(a, b, p);
+  const d2 = cross(b, c, p);
+  const d3 = cross(c, a, p);
 
-  return pointInTriangle(player, a, b, c) ||
-    distanceToSegment(player, a, b) < R - 2 ||
-    distanceToSegment(player, b, c) < R - 2 ||
-    distanceToSegment(player, c, a) < R - 2;
+  const inside = !(
+    (d1 < 0 || d2 < 0 || d3 < 0) &&
+    (d1 > 0 || d2 > 0 || d3 > 0)
+  );
+
+  return inside ||
+    distanceToSegment(p, a, b) < R - 2 ||
+    distanceToSegment(p, b, c) < R - 2 ||
+    distanceToSegment(p, c, a) < R - 2;
 }
 
 function update(dt) {
-  if (mode === "paused") return;
+  if (state === "paused") return;
 
   for (const p of particles) {
     p.life -= dt;
@@ -369,153 +455,307 @@ function update(dt) {
   }
   particles = particles.filter(p => p.life > 0);
 
-  if (mode !== "playing") return;
+  if (state !== "playing") return;
 
-  time += dt;
-  flipCooldown = Math.max(0, flipCooldown - dt);
+  world += SPEED * dt;
 
-  const speed = Math.min(430, 210 + time * 3);
-  distance += speed * dt;
-  backgroundOffset = (backgroundOffset + speed * dt) % 40;
-
-  player.vy += player.gravity * 1600 * dt;
-  player.y += player.vy * dt;
-
-  if (player.y >= BOTTOM - R) {
-    player.y = BOTTOM - R;
-    player.vy = Math.min(0, player.vy);
+  if (
+    portalIndex < portals.length &&
+    world >= portals[portalIndex].x
+  ) {
+    changeForm(portals[portalIndex].mode);
+    portalIndex += 1;
   }
 
-  if (player.y <= TOP + R) {
-    player.y = TOP + R;
-    player.vy = Math.max(0, player.vy);
+  const oldY = player.y;
+
+  if (form === "cube") {
+    player.vy += 1500 * dt;
+    player.y += player.vy * dt;
+    player.grounded = false;
+
+    // Land on platform tops; side collisions are fatal.
+    for (const platform of platforms) {
+      const x = platform.x - world + PX;
+      const top = FLOOR - platform.height;
+
+      const overlapsX =
+        PX + R > x && PX - R < x + platform.width;
+
+      if (
+        overlapsX &&
+        player.vy >= 0 &&
+        oldY + R <= top + 1 &&
+        player.y + R >= top
+      ) {
+        player.y = top - R;
+        player.vy = 0;
+        player.grounded = true;
+      } else if (
+        circleRect(
+          PX, player.y, R - 2,
+          x, top, platform.width, platform.height
+        )
+      ) {
+        die();
+        return;
+      }
+    }
+
+    if (player.y + R >= FLOOR) {
+      player.y = FLOOR - R;
+      player.vy = 0;
+      player.grounded = true;
+    }
+
+    if (!player.grounded) angle += dt * 7;
+    else angle = 0;
+
+    for (const spike of spikes) {
+      if (spikeHit(spike)) {
+        die();
+        return;
+      }
+    }
+  } else if (form === "ship") {
+    player.vy += (held ? -1050 : 850) * dt;
+    player.vy = Math.max(-270, Math.min(270, player.vy));
+    player.y += player.vy * dt;
+    angle = player.vy / 650;
+  } else {
+    player.vy = held ? -230 : 230;
+    player.y += player.vy * dt;
+    angle = held ? -Math.PI / 4 : Math.PI / 4;
   }
 
-  spawnIn -= dt;
-  if (spawnIn <= 0) spawnObstacle(speed);
+  if (
+    form !== "cube" &&
+    (player.y - R <= TOP || player.y + R >= FLOOR)
+  ) {
+    die();
+    return;
+  }
 
-  for (const obstacle of obstacles) {
-    obstacle.x -= speed * dt;
+  for (const gate of gates) {
+    const x = gate.x - world + PX;
+    const openingTop = gate.center - gate.gap / 2;
+    const openingBottom = gate.center + gate.gap / 2;
 
-    if (hitsSpike(obstacle)) {
-      end();
+    if (
+      circleRect(
+        PX, player.y, R - 2,
+        x, TOP, gate.width, openingTop - TOP
+      ) ||
+      circleRect(
+        PX, player.y, R - 2,
+        x, openingBottom, gate.width, FLOOR - openingBottom
+      )
+    ) {
+      die();
       return;
     }
   }
 
-  for (const coin of coins) {
-    coin.x -= speed * dt;
-
-    if (!coin.collected &&
-        Math.hypot(coin.x - player.x, coin.y - player.y) < R + 11) {
-      coin.collected = true;
-      coinCount += 1;
-      burst(coin.x, coin.y, "#facc15");
-    }
+  for (const t of trail) {
+    t.x -= SPEED * dt;
+    t.life -= dt;
   }
 
-  obstacles = obstacles.filter(o => o.x + o.width > -20);
-  coins = coins.filter(c => c.x > -20 && !c.collected);
+  trail.push({
+    x: PX,
+    y: player.y,
+    life: 0.45
+  });
 
-  score = Math.floor(distance / 15) + coinCount * 50;
-  hud();
+  trail = trail.filter(t => t.life > 0);
+
+  updateUI();
+
+  if (world >= FINISH) win();
 }
 
 function draw() {
   ctx.clearRect(0, 0, W, H);
 
-  ctx.strokeStyle = "#211a42";
+  const offset = (world * 0.5) % 40;
+
+  ctx.strokeStyle = "#1b2542";
   ctx.lineWidth = 1;
 
-  for (let x = -backgroundOffset; x < W; x += 40) {
+  for (let x = -offset; x < W; x += 40) {
     ctx.beginPath();
     ctx.moveTo(x, TOP);
-    ctx.lineTo(x, BOTTOM);
+    ctx.lineTo(x, FLOOR);
     ctx.stroke();
   }
 
-  for (let y = TOP; y <= BOTTOM; y += 40) {
+  for (let y = TOP; y <= FLOOR; y += 40) {
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(W, y);
     ctx.stroke();
   }
 
-  ctx.fillStyle = "#20163e";
+  ctx.fillStyle = "#172039";
   ctx.fillRect(0, 0, W, TOP);
-  ctx.fillRect(0, BOTTOM, W, H - BOTTOM);
+  ctx.fillRect(0, FLOOR, W, H - FLOOR);
 
-  ctx.strokeStyle = "#a78bfa";
+  ctx.strokeStyle = colors[form];
   ctx.lineWidth = 3;
 
-  for (const y of [TOP, BOTTOM]) {
+  for (const y of [TOP, FLOOR]) {
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(W, y);
     ctx.stroke();
   }
 
-  for (const obstacle of obstacles) {
-    const [a, b, c] = triangle(obstacle);
+  for (const platform of platforms) {
+    const x = platform.x - world + PX;
+    if (x > W || x + platform.width < 0) continue;
 
-    ctx.fillStyle = "#be185d";
+    ctx.fillStyle = "#14532d";
+    ctx.strokeStyle = "#86efac";
+    ctx.lineWidth = 2;
+
+    ctx.fillRect(
+      x, FLOOR - platform.height,
+      platform.width, platform.height
+    );
+    ctx.strokeRect(
+      x, FLOOR - platform.height,
+      platform.width, platform.height
+    );
+  }
+
+  for (const spike of spikes) {
+    const x = spike.x - world + PX;
+    if (x > W || x + spike.width < 0) continue;
+
+    ctx.fillStyle = "#9f1239";
     ctx.strokeStyle = "#fb7185";
     ctx.lineWidth = 2;
 
     ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.lineTo(c.x, c.y);
+    ctx.moveTo(x, FLOOR);
+    ctx.lineTo(x + spike.width / 2, FLOOR - spike.height);
+    ctx.lineTo(x + spike.width, FLOOR);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
   }
 
-  for (const coin of coins) {
-    ctx.shadowBlur = 12;
-    ctx.shadowColor = "#facc15";
-    ctx.fillStyle = "#facc15";
-    ctx.beginPath();
-    ctx.arc(coin.x, coin.y, 10, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
+  for (const gate of gates) {
+    const x = gate.x - world + PX;
+    if (x > W || x + gate.width < 0) continue;
 
-    ctx.fillStyle = "#854d0e";
-    ctx.font = "bold 12px system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText("$", coin.x, coin.y + 4);
-  }
+    const openingTop = gate.center - gate.gap / 2;
+    const openingBottom = gate.center + gate.gap / 2;
 
-  if (mode !== "over") {
-    ctx.shadowBlur = 18;
-    ctx.shadowColor = "#67e8f9";
-    ctx.fillStyle = "#67e8f9";
-
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, R, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    ctx.fillStyle = "#083344";
-    ctx.beginPath();
-    ctx.arc(player.x + 4, player.y - 3, 2.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = "#c4b5fd";
+    ctx.fillStyle = "#4c1d55";
+    ctx.strokeStyle = "#f0abfc";
     ctx.lineWidth = 2;
 
-    const arrowY = player.y + player.gravity * 28;
+    ctx.fillRect(x, TOP, gate.width, openingTop - TOP);
+    ctx.strokeRect(x, TOP, gate.width, openingTop - TOP);
+
+    ctx.fillRect(
+      x, openingBottom, gate.width, FLOOR - openingBottom
+    );
+    ctx.strokeRect(
+      x, openingBottom, gate.width, FLOOR - openingBottom
+    );
+  }
+
+  for (const portal of portals) {
+    const x = portal.x - world + PX;
+    if (x < -50 || x > W + 50) continue;
+
+    ctx.save();
+    ctx.strokeStyle = colors[portal.mode];
+    ctx.shadowColor = colors[portal.mode];
+    ctx.shadowBlur = 20;
+    ctx.lineWidth = 6;
+
     ctx.beginPath();
-    ctx.moveTo(player.x, arrowY - player.gravity * 8);
-    ctx.lineTo(player.x, arrowY);
-    ctx.moveTo(player.x - 4, arrowY - player.gravity * 4);
-    ctx.lineTo(player.x, arrowY);
-    ctx.lineTo(player.x + 4, arrowY - player.gravity * 4);
+    ctx.ellipse(x, 200, 20, 128, 0, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = colors[portal.mode];
+    ctx.font = "bold 16px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(portal.mode.toUpperCase(), x, 60);
+  }
+
+  const finishX = FINISH - world + PX;
+  if (finishX >= 0 && finishX <= W) {
+    ctx.fillStyle = "#facc15";
+    ctx.fillRect(finishX, TOP, 5, FLOOR - TOP);
+    ctx.font = "bold 16px system-ui";
+    ctx.textAlign = "right";
+    ctx.fillText("FINISH", finishX - 8, 65);
+  }
+
+  ctx.strokeStyle = colors[form];
+  ctx.lineWidth = form === "wave" ? 4 : 2;
+
+  if (trail.length > 1) {
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath();
+
+    trail.forEach((t, index) => {
+      if (index === 0) ctx.moveTo(t.x, t.y);
+      else ctx.lineTo(t.x, t.y);
+    });
+
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  if (player && state !== "over") {
+    ctx.save();
+    ctx.translate(PX, player.y);
+    ctx.rotate(angle);
+
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = colors[form];
+    ctx.fillStyle = colors[form];
+
+    if (form === "cube") {
+      ctx.fillRect(-R, -R, R * 2, R * 2);
+
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#14532d";
+      ctx.fillRect(1, -6, 5, 5);
+      ctx.fillRect(-6, -6, 4, 5);
+    } else if (form === "ship") {
+      ctx.beginPath();
+      ctx.moveTo(20, 0);
+      ctx.lineTo(-14, -12);
+      ctx.lineTo(-7, 0);
+      ctx.lineTo(-14, 12);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#fb923c";
+      ctx.fillRect(-22, -4, 10 + Math.random() * 8, 8);
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(18, 0);
+      ctx.lineTo(-11, -11);
+      ctx.lineTo(-6, 0);
+      ctx.lineTo(-11, 11);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.restore();
   }
 
   for (const p of particles) {
-    ctx.globalAlpha = Math.max(0, p.life / 0.6);
+    ctx.globalAlpha = Math.max(0, p.life / 0.7);
     ctx.fillStyle = p.color;
     ctx.fillRect(p.x, p.y, 4, 4);
   }
@@ -523,19 +763,53 @@ function draw() {
   ctx.globalAlpha = 1;
 }
 
-canvas.addEventListener("pointerdown", event => {
-  event.preventDefault();
-  canvas.focus();
-  flip();
-});
+// One active touch controls the game.
+function attachTouch(element) {
+  element.addEventListener("pointerdown", event => {
+    if (
+      state !== "playing" ||
+      activePointer !== null ||
+      keyHeld
+    ) return;
 
-$("flip").onclick = flip;
-$("pause").onclick = togglePause;
+    event.preventDefault();
+
+    activePointer = event.pointerId;
+    element.setPointerCapture(event.pointerId);
+    press();
+  });
+
+  function release(event) {
+    if (event.pointerId === activePointer) {
+      activePointer = null;
+      held = false;
+    }
+  }
+
+  element.addEventListener("pointerup", release);
+  element.addEventListener("pointercancel", release);
+  element.addEventListener("lostpointercapture", release);
+  element.addEventListener("contextmenu", event => {
+    event.preventDefault();
+  });
+}
+
+attachTouch(canvas);
+attachTouch($("control"));
 
 window.addEventListener("keydown", event => {
   if (event.code === "Space" || event.code === "ArrowUp") {
     event.preventDefault();
-    if (!event.repeat) flip();
+
+    if (
+      !event.repeat &&
+      !keyHeld &&
+      activePointer === null &&
+      state === "playing"
+    ) {
+      keyHeld = true;
+      press();
+    }
   }
 
   if (event.code === "KeyP" && !event.repeat) {
@@ -543,23 +817,50 @@ window.addEventListener("keydown", event => {
   }
 });
 
+window.addEventListener("keyup", event => {
+  if (
+    (event.code === "Space" || event.code === "ArrowUp") &&
+    keyHeld
+  ) {
+    keyHeld = false;
+    held = false;
+  }
+});
+
 window.addEventListener("blur", () => {
-  if (mode === "playing") togglePause();
+  if (state === "playing") togglePause();
+  clearInput();
 });
 
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden && mode === "playing") togglePause();
+  if (document.hidden && state === "playing") togglePause();
 });
 
-$("action").onclick = start;
+$("pause").onclick = togglePause;
+
+updateUI();
+
+showOverlay(
+  "PORTAL RUNNER",
+  "Cube: tap to jump. Ship: hold to rise. Wave: hold up, release down. Cross the portals and reach the finish!",
+  "Start",
+  start
+);
 
 let previous = performance.now();
 
 function frame(now) {
-  const dt = Math.min((now - previous) / 1000, 0.033);
+  const elapsed = Math.min((now - previous) / 1000, 0.05);
   previous = now;
 
-  update(dt);
+  // Small physics steps reduce missed collisions.
+  const steps = Math.max(1, Math.ceil(elapsed / 0.008));
+  const dt = elapsed / steps;
+
+  for (let i = 0; i < steps; i++) {
+    update(dt);
+  }
+
   draw();
   requestAnimationFrame(frame);
 }
