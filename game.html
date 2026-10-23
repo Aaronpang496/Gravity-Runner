@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 body {
   margin: 0;
@@ -66,8 +68,8 @@ canvas {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  text-align: center;
   padding: 20px;
+  text-align: center;
   background: rgba(5, 9, 23, 0.9);
   border-radius: 14px;
 }
@@ -79,21 +81,22 @@ canvas {
 h2 {
   margin: 8px;
   color: #67e8f9;
-  font-size: 28px;
+  font-size: clamp(20px, 5vw, 30px);
 }
 
 p {
   line-height: 1.6;
+  font-size: 14px;
 }
 
 button {
   border: 0;
   border-radius: 12px;
   padding: 15px;
-  font: bold 16px system-ui;
-  cursor: pointer;
   background: #67e8f9;
   color: #083344;
+  font: bold 16px system-ui;
+  cursor: pointer;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -152,13 +155,13 @@ small {
       width="640"
       height="400"
       tabindex="0"
-      aria-label="Portal Runner game"
+      aria-label="Portal Runner game arena"
     ></canvas>
 
     <div id="overlay">
       <h2 id="title">PORTAL RUNNER</h2>
       <p id="message"></p>
-      <button id="action">Start</button>
+      <button id="action">Start random map</button>
     </div>
   </div>
 
@@ -172,7 +175,7 @@ small {
   <small>
     Touch the arena or use the large control button.<br>
     Keyboard: Space or ↑. P pauses.<br>
-    Portals change your movement mode. Each retry uses the same course.
+    Every new run generates a different course.
   </small>
 </div>
 
@@ -205,43 +208,102 @@ const portals = [
 
 let state = "ready";
 let form = "cube";
-let player;
+let player = null;
+
 let world = 0;
 let attempt = 1;
 let portalIndex = 0;
 let angle = 0;
+
 let held = false;
 let activePointer = null;
 let keyHeld = false;
+
 let trail = [];
 let particles = [];
 
-// Original fixed level.
-const spikes = [
-  {x: 720, width: 40, height: 38},
-  {x: 1060, width: 64, height: 38},
-  {x: 1680, width: 55, height: 38},
-  {x: 2040, width: 76, height: 38},
-  {x: 2330, width: 42, height: 38}
-];
+let spikes = [];
+let platforms = [];
+let gates = [];
 
-const platforms = [
-  {x: 1330, width: 140, height: 48}
-];
+function randomBetween(min, max) {
+  return min + Math.random() * (max - min);
+}
 
-// Gates have a clear opening between top and bottom walls.
-const gates = [
-  {x: 3160, width: 45, center: 200, gap: 210},
-  {x: 3630, width: 45, center: 145, gap: 190},
-  {x: 4100, width: 45, center: 245, gap: 190},
-  {x: 4570, width: 45, center: 180, gap: 200},
+function generateMap() {
+  spikes = [];
+  platforms = [];
+  gates = [];
 
-  {x: 5720, width: 40, center: 200, gap: 240},
-  {x: 6190, width: 40, center: 145, gap: 210},
-  {x: 6660, width: 40, center: 245, gap: 210},
-  {x: 7130, width: 40, center: 155, gap: 210},
-  {x: 7600, width: 40, center: 220, gap: 220}
-];
+  // CUBE:
+  // Obstacles are separated to allow landing between jumps.
+  let x = randomBetween(650, 780);
+  let previousWasPlatform = false;
+
+  while (x < 2300) {
+    const makePlatform =
+      !previousWasPlatform && Math.random() < 0.3;
+
+    if (makePlatform) {
+      platforms.push({
+        x,
+        width: randomBetween(85, 115),
+        height: randomBetween(30, 48)
+      });
+    } else {
+      spikes.push({
+        x,
+        width: randomBetween(35, 70),
+        height: randomBetween(30, 42)
+      });
+    }
+
+    previousWasPlatform = makePlatform;
+    x += randomBetween(390, 480);
+  }
+
+  // SHIP:
+  // Gradual opening-height changes and wide passages.
+  let center = 200;
+  x = randomBetween(3150, 3250);
+
+  while (x < 4850) {
+    center = Math.max(
+      150,
+      Math.min(250, center + randomBetween(-45, 45))
+    );
+
+    gates.push({
+      x,
+      width: randomBetween(32, 48),
+      center,
+      gap: randomBetween(200, 220)
+    });
+
+    x += randomBetween(440, 510);
+  }
+
+  // WAVE:
+  // Room to zigzag, with changing opening positions.
+  center = 200;
+  x = randomBetween(5700, 5800);
+
+  while (x < 7750) {
+    center = Math.max(
+      165,
+      Math.min(235, center + randomBetween(-45, 45))
+    );
+
+    gates.push({
+      x,
+      width: randomBetween(28, 42),
+      center,
+      gap: randomBetween(225, 245)
+    });
+
+    x += randomBetween(420, 500);
+  }
+}
 
 function clearInput() {
   held = false;
@@ -250,27 +312,32 @@ function clearInput() {
 }
 
 function updateUI() {
-  const percent = Math.min(100, Math.floor(world / FINISH * 100));
+  const percent = Math.min(
+    100,
+    Math.floor(world / FINISH * 100)
+  );
 
   $("form").textContent = form.toUpperCase();
   $("form").style.color = colors[form];
+
   $("percent").textContent = percent + "%";
   $("progress").style.width = percent + "%";
   $("progress").style.background = colors[form];
+
   $("attempt").textContent = "Attempt " + attempt;
 
   if (form === "cube") {
     $("control").textContent = "TAP TO JUMP";
     $("hint").textContent =
-      "CUBE: tap to jump. You can land on raised platforms.";
+      "CUBE: tap to jump. Land before jumping again.";
   } else if (form === "ship") {
     $("control").textContent = "HOLD TO RISE";
     $("hint").textContent =
-      "SHIP: hold to rise, release to descend. Avoid both boundaries.";
+      "SHIP: hold to rise, release to descend.";
   } else {
     $("control").textContent = "HOLD UP · RELEASE DOWN";
     $("hint").textContent =
-      "WAVE: hold for diagonal up, release for diagonal down.";
+      "WAVE: hold to go diagonally up, release to go down.";
   }
 }
 
@@ -283,10 +350,13 @@ function showOverlay(title, message, label, action) {
 }
 
 function start() {
+  generateMap();
+
   world = 0;
   portalIndex = 0;
   form = "cube";
   angle = 0;
+
   player = {
     y: FLOOR - R,
     vy: 0,
@@ -294,12 +364,15 @@ function start() {
   };
 
   clearInput();
+
   trail = [];
   particles = [];
+
   state = "playing";
 
   $("pause").textContent = "Pause";
   $("overlay").classList.add("hidden");
+
   updateUI();
 }
 
@@ -311,9 +384,11 @@ function retry() {
 function burst(x, y, color) {
   for (let i = 0; i < 30; i++) {
     const a = Math.random() * Math.PI * 2;
-    const speed = 50 + Math.random() * 180;
+    const speed = randomBetween(50, 230);
+
     particles.push({
-      x, y,
+      x,
+      y,
       vx: Math.cos(a) * speed,
       vy: Math.sin(a) * speed,
       life: 0.7,
@@ -327,18 +402,20 @@ function die() {
 
   state = "over";
   clearInput();
+
   burst(PX, player.y, colors[form]);
 
   const tip = form === "cube"
-    ? "Jump before reaching the spikes. Tap again only after landing."
+    ? "Jump before the spikes and platform edges."
     : form === "ship"
-      ? "Use short holds and releases to control your height."
-      : "Switch direction frequently. Holding too long reaches a wall.";
+      ? "Use short holds and releases to adjust your height."
+      : "Alternate holding and releasing before reaching a wall.";
 
   showOverlay(
     "CRASH!",
-    Math.floor(world / FINISH * 100) + "% complete. " + tip,
-    "Retry",
+    Math.floor(world / FINISH * 100) +
+      "% complete. " + tip,
+    "Try a new random map",
     retry
   );
 }
@@ -349,8 +426,8 @@ function win() {
 
   showOverlay(
     "COURSE COMPLETE!",
-    "You mastered Cube, Ship, and Wave in " + attempt + " attempt(s).",
-    "Play again",
+    "You survived all three modes! Ready for a different course?",
+    "Play a new random map",
     retry
   );
 }
@@ -359,11 +436,12 @@ function togglePause() {
   if (state === "playing") {
     state = "paused";
     clearInput();
+
     $("pause").textContent = "Resume";
 
     showOverlay(
       "PAUSED",
-      "Your run is waiting.",
+      "Resume keeps your current map.",
       "Resume",
       togglePause
     );
@@ -387,24 +465,33 @@ function press() {
 
 function changeForm(next) {
   form = next;
+
+  // A safe entry position for each flying section.
   player.y = 200;
   player.vy = 0;
   player.grounded = false;
+
   trail = [];
   burst(PX, player.y, colors[form]);
+
   updateUI();
 }
 
 function circleRect(cx, cy, radius, x, y, width, height) {
   const nearestX = Math.max(x, Math.min(x + width, cx));
   const nearestY = Math.max(y, Math.min(y + height, cy));
-  return Math.hypot(cx - nearestX, cy - nearestY) < radius;
+
+  return Math.hypot(
+    cx - nearestX,
+    cy - nearestY
+  ) < radius;
 }
 
 function distanceToSegment(p, a, b) {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const squared = dx * dx + dy * dy;
+
   const t = squared === 0 ? 0 : Math.max(
     0,
     Math.min(
@@ -412,6 +499,7 @@ function distanceToSegment(p, a, b) {
       ((p.x - a.x) * dx + (p.y - a.y) * dy) / squared
     )
   );
+
   return Math.hypot(
     p.x - a.x - t * dx,
     p.y - a.y - t * dy
@@ -420,14 +508,24 @@ function distanceToSegment(p, a, b) {
 
 function spikeHit(spike) {
   const x = spike.x - world + PX;
+
   const a = {x, y: FLOOR};
-  const b = {x: x + spike.width / 2, y: FLOOR - spike.height};
-  const c = {x: x + spike.width, y: FLOOR};
+  const b = {
+    x: x + spike.width / 2,
+    y: FLOOR - spike.height
+  };
+  const c = {
+    x: x + spike.width,
+    y: FLOOR
+  };
+
   const p = {x: PX, y: player.y};
 
   function cross(a, b, p) {
-    return (b.x - a.x) * (p.y - a.y) -
-           (b.y - a.y) * (p.x - a.x);
+    return (
+      (b.x - a.x) * (p.y - a.y) -
+      (b.y - a.y) * (p.x - a.x)
+    );
   }
 
   const d1 = cross(a, b, p);
@@ -453,6 +551,7 @@ function update(dt) {
     p.x += p.vx * dt;
     p.y += p.vy * dt;
   }
+
   particles = particles.filter(p => p.life > 0);
 
   if (state !== "playing") return;
@@ -474,27 +573,33 @@ function update(dt) {
     player.y += player.vy * dt;
     player.grounded = false;
 
-    // Land on platform tops; side collisions are fatal.
     for (const platform of platforms) {
       const x = platform.x - world + PX;
       const top = FLOOR - platform.height;
 
       const overlapsX =
-        PX + R > x && PX - R < x + platform.width;
+        PX + R > x &&
+        PX - R < x + platform.width;
 
-      if (
+      const landing =
         overlapsX &&
         player.vy >= 0 &&
         oldY + R <= top + 1 &&
-        player.y + R >= top
-      ) {
+        player.y + R >= top;
+
+      if (landing) {
         player.y = top - R;
         player.vy = 0;
         player.grounded = true;
       } else if (
         circleRect(
-          PX, player.y, R - 2,
-          x, top, platform.width, platform.height
+          PX,
+          player.y,
+          R - 2,
+          x,
+          top,
+          platform.width,
+          platform.height
         )
       ) {
         die();
@@ -508,8 +613,11 @@ function update(dt) {
       player.grounded = true;
     }
 
-    if (!player.grounded) angle += dt * 7;
-    else angle = 0;
+    if (!player.grounded) {
+      angle += dt * 7;
+    } else {
+      angle = 0;
+    }
 
     for (const spike of spikes) {
       if (spikeHit(spike)) {
@@ -521,16 +629,21 @@ function update(dt) {
     player.vy += (held ? -1050 : 850) * dt;
     player.vy = Math.max(-270, Math.min(270, player.vy));
     player.y += player.vy * dt;
+
     angle = player.vy / 650;
   } else {
     player.vy = held ? -230 : 230;
     player.y += player.vy * dt;
+
     angle = held ? -Math.PI / 4 : Math.PI / 4;
   }
 
   if (
     form !== "cube" &&
-    (player.y - R <= TOP || player.y + R >= FLOOR)
+    (
+      player.y - R <= TOP ||
+      player.y + R >= FLOOR
+    )
   ) {
     die();
     return;
@@ -541,16 +654,27 @@ function update(dt) {
     const openingTop = gate.center - gate.gap / 2;
     const openingBottom = gate.center + gate.gap / 2;
 
-    if (
-      circleRect(
-        PX, player.y, R - 2,
-        x, TOP, gate.width, openingTop - TOP
-      ) ||
-      circleRect(
-        PX, player.y, R - 2,
-        x, openingBottom, gate.width, FLOOR - openingBottom
-      )
-    ) {
+    const hitTop = circleRect(
+      PX,
+      player.y,
+      R - 2,
+      x,
+      TOP,
+      gate.width,
+      openingTop - TOP
+    );
+
+    const hitBottom = circleRect(
+      PX,
+      player.y,
+      R - 2,
+      x,
+      openingBottom,
+      gate.width,
+      FLOOR - openingBottom
+    );
+
+    if (hitTop || hitBottom) {
       die();
       return;
     }
@@ -612,6 +736,7 @@ function draw() {
 
   for (const platform of platforms) {
     const x = platform.x - world + PX;
+
     if (x > W || x + platform.width < 0) continue;
 
     ctx.fillStyle = "#14532d";
@@ -619,17 +744,23 @@ function draw() {
     ctx.lineWidth = 2;
 
     ctx.fillRect(
-      x, FLOOR - platform.height,
-      platform.width, platform.height
+      x,
+      FLOOR - platform.height,
+      platform.width,
+      platform.height
     );
+
     ctx.strokeRect(
-      x, FLOOR - platform.height,
-      platform.width, platform.height
+      x,
+      FLOOR - platform.height,
+      platform.width,
+      platform.height
     );
   }
 
   for (const spike of spikes) {
     const x = spike.x - world + PX;
+
     if (x > W || x + spike.width < 0) continue;
 
     ctx.fillStyle = "#9f1239";
@@ -638,15 +769,20 @@ function draw() {
 
     ctx.beginPath();
     ctx.moveTo(x, FLOOR);
-    ctx.lineTo(x + spike.width / 2, FLOOR - spike.height);
+    ctx.lineTo(
+      x + spike.width / 2,
+      FLOOR - spike.height
+    );
     ctx.lineTo(x + spike.width, FLOOR);
     ctx.closePath();
+
     ctx.fill();
     ctx.stroke();
   }
 
   for (const gate of gates) {
     const x = gate.x - world + PX;
+
     if (x > W || x + gate.width < 0) continue;
 
     const openingTop = gate.center - gate.gap / 2;
@@ -656,42 +792,79 @@ function draw() {
     ctx.strokeStyle = "#f0abfc";
     ctx.lineWidth = 2;
 
-    ctx.fillRect(x, TOP, gate.width, openingTop - TOP);
-    ctx.strokeRect(x, TOP, gate.width, openingTop - TOP);
+    ctx.fillRect(
+      x,
+      TOP,
+      gate.width,
+      openingTop - TOP
+    );
+
+    ctx.strokeRect(
+      x,
+      TOP,
+      gate.width,
+      openingTop - TOP
+    );
 
     ctx.fillRect(
-      x, openingBottom, gate.width, FLOOR - openingBottom
+      x,
+      openingBottom,
+      gate.width,
+      FLOOR - openingBottom
     );
+
     ctx.strokeRect(
-      x, openingBottom, gate.width, FLOOR - openingBottom
+      x,
+      openingBottom,
+      gate.width,
+      FLOOR - openingBottom
     );
   }
 
   for (const portal of portals) {
     const x = portal.x - world + PX;
+
     if (x < -50 || x > W + 50) continue;
 
     ctx.save();
+
     ctx.strokeStyle = colors[portal.mode];
     ctx.shadowColor = colors[portal.mode];
     ctx.shadowBlur = 20;
     ctx.lineWidth = 6;
 
     ctx.beginPath();
-    ctx.ellipse(x, 200, 20, 128, 0, 0, Math.PI * 2);
+    ctx.ellipse(
+      x, 200,
+      20, 128,
+      0, 0, Math.PI * 2
+    );
     ctx.stroke();
+
     ctx.restore();
 
     ctx.fillStyle = colors[portal.mode];
     ctx.font = "bold 16px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText(portal.mode.toUpperCase(), x, 60);
+
+    ctx.fillText(
+      portal.mode.toUpperCase(),
+      x,
+      60
+    );
   }
 
   const finishX = FINISH - world + PX;
+
   if (finishX >= 0 && finishX <= W) {
     ctx.fillStyle = "#facc15";
-    ctx.fillRect(finishX, TOP, 5, FLOOR - TOP);
+    ctx.fillRect(
+      finishX,
+      TOP,
+      5,
+      FLOOR - TOP
+    );
+
     ctx.font = "bold 16px system-ui";
     ctx.textAlign = "right";
     ctx.fillText("FINISH", finishX - 8, 65);
@@ -705,8 +878,11 @@ function draw() {
     ctx.beginPath();
 
     trail.forEach((t, index) => {
-      if (index === 0) ctx.moveTo(t.x, t.y);
-      else ctx.lineTo(t.x, t.y);
+      if (index === 0) {
+        ctx.moveTo(t.x, t.y);
+      } else {
+        ctx.lineTo(t.x, t.y);
+      }
     });
 
     ctx.stroke();
@@ -715,6 +891,7 @@ function draw() {
 
   if (player && state !== "over") {
     ctx.save();
+
     ctx.translate(PX, player.y);
     ctx.rotate(angle);
 
@@ -727,6 +904,7 @@ function draw() {
 
       ctx.shadowBlur = 0;
       ctx.fillStyle = "#14532d";
+
       ctx.fillRect(1, -6, 5, 5);
       ctx.fillRect(-6, -6, 4, 5);
     } else if (form === "ship") {
@@ -740,7 +918,13 @@ function draw() {
 
       ctx.shadowBlur = 0;
       ctx.fillStyle = "#fb923c";
-      ctx.fillRect(-22, -4, 10 + Math.random() * 8, 8);
+
+      ctx.fillRect(
+        -22,
+        -4,
+        10 + Math.random() * 8,
+        8
+      );
     } else {
       ctx.beginPath();
       ctx.moveTo(18, 0);
@@ -763,19 +947,20 @@ function draw() {
   ctx.globalAlpha = 1;
 }
 
-// One active touch controls the game.
 function attachTouch(element) {
   element.addEventListener("pointerdown", event => {
     if (
       state !== "playing" ||
       activePointer !== null ||
-      keyHeld
+      keyHeld ||
+      (event.pointerType === "mouse" && event.button !== 0)
     ) return;
 
     event.preventDefault();
 
     activePointer = event.pointerId;
     element.setPointerCapture(event.pointerId);
+
     press();
   });
 
@@ -789,6 +974,7 @@ function attachTouch(element) {
   element.addEventListener("pointerup", release);
   element.addEventListener("pointercancel", release);
   element.addEventListener("lostpointercapture", release);
+
   element.addEventListener("contextmenu", event => {
     event.preventDefault();
   });
@@ -798,7 +984,10 @@ attachTouch(canvas);
 attachTouch($("control"));
 
 window.addEventListener("keydown", event => {
-  if (event.code === "Space" || event.code === "ArrowUp") {
+  if (
+    event.code === "Space" ||
+    event.code === "ArrowUp"
+  ) {
     event.preventDefault();
 
     if (
@@ -819,7 +1008,10 @@ window.addEventListener("keydown", event => {
 
 window.addEventListener("keyup", event => {
   if (
-    (event.code === "Space" || event.code === "ArrowUp") &&
+    (
+      event.code === "Space" ||
+      event.code === "ArrowUp"
+    ) &&
     keyHeld
   ) {
     keyHeld = false;
@@ -833,7 +1025,9 @@ window.addEventListener("blur", () => {
 });
 
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden && state === "playing") togglePause();
+  if (document.hidden && state === "playing") {
+    togglePause();
+  }
 });
 
 $("pause").onclick = togglePause;
@@ -842,19 +1036,27 @@ updateUI();
 
 showOverlay(
   "PORTAL RUNNER",
-  "Cube: tap to jump. Ship: hold to rise. Wave: hold up, release down. Cross the portals and reach the finish!",
-  "Start",
+  "Cube: tap to jump. Ship: hold to rise. Wave: hold up, release down. Every run creates a new course!",
+  "Start random map",
   start
 );
 
 let previous = performance.now();
 
 function frame(now) {
-  const elapsed = Math.min((now - previous) / 1000, 0.05);
+  const elapsed = Math.min(
+    (now - previous) / 1000,
+    0.05
+  );
+
   previous = now;
 
-  // Small physics steps reduce missed collisions.
-  const steps = Math.max(1, Math.ceil(elapsed / 0.008));
+  // Small physics steps help prevent missed collisions.
+  const steps = Math.max(
+    1,
+    Math.ceil(elapsed / 0.008)
+  );
+
   const dt = elapsed / steps;
 
   for (let i = 0; i < steps; i++) {
