@@ -2,181 +2,236 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>
-* {
-  box-sizing: border-box;
-}
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 
-body {
-  margin: 0;
-  background: #080b19;
-  color: #e2e8f0;
-  font-family: system-ui, sans-serif;
-}
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #080b19;
+    font-family: system-ui, sans-serif;
+  }
 
-.wrap {
-  max-width: 640px;
-  margin: auto;
-  padding: 8px;
-}
+  #game-wrap {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    background: #080b19;
+  }
 
-.hud {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 12px 0;
-  font-size: 14px;
-  font-weight: bold;
-}
+  #hud {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: 14px;
+    font-weight: bold;
+    background: #0c1228;
+    color: #e2e8f0;
+    flex-shrink: 0;
+    z-index: 10;
+  }
 
-.track {
-  height: 6px;
-  background: #263249;
-  border-radius: 8px;
-  margin-bottom: 10px;
-  overflow: hidden;
-}
+  #progress-track {
+    height: 5px;
+    background: #263249;
+    flex-shrink: 0;
+    z-index: 10;
+  }
 
-#progress {
-  height: 100%;
-  width: 0;
-  background: #67e8f9;
-}
+  #progress {
+    height: 100%;
+    width: 0;
+    background: #67e8f9;
+    transition: width 0.1s linear, background 0.2s;
+  }
 
-.arena {
-  position: relative;
-}
+  #arena {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+  }
 
-canvas {
-  display: block;
-  width: 100%;
-  height: auto;
-  background: #0c1228;
-  border: 2px solid #334155;
-  border-radius: 14px;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-}
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: #0c1228;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    outline: none;
+  }
 
-#overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  text-align: center;
-  background: rgba(5, 9, 23, 0.9);
-  border-radius: 14px;
-}
+  #overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    text-align: center;
+    background: rgba(5, 9, 23, 0.94);
+    z-index: 20;
+    overflow-y: auto;
+  }
 
-#overlay.hidden {
-  display: none;
-}
+  #overlay.hidden {
+    display: none;
+  }
 
-h2 {
-  margin: 8px;
-  color: #67e8f9;
-  font-size: clamp(20px, 5vw, 30px);
-}
+  #overlay h2 {
+    margin: 8px;
+    color: #67e8f9;
+    font-size: clamp(22px, 6vw, 34px);
+    letter-spacing: 1px;
+  }
 
-p {
-  line-height: 1.6;
-  font-size: 14px;
-}
+  #overlay p {
+    line-height: 1.6;
+    font-size: 14px;
+    color: #cbd5e1;
+    margin: 6px 0;
+    max-width: 480px;
+  }
 
-button {
-  border: 0;
-  border-radius: 12px;
-  padding: 15px;
-  background: #67e8f9;
-  color: #083344;
-  font: bold 16px system-ui;
-  cursor: pointer;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
-}
+  #overlay button {
+    border: 0;
+    border-radius: 12px;
+    padding: 14px;
+    background: #67e8f9;
+    color: #083344;
+    font: bold 16px system-ui;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
 
-.controls {
-  display: flex;
-  gap: 10px;
-  margin-top: 12px;
-}
+  .diff-btn {
+    width: 100%;
+    max-width: 300px;
+    margin: 5px 0;
+    font-size: 17px;
+    padding: 13px;
+    background: #1e293b;
+    color: #e2e8f0;
+    border: 2px solid #334155;
+    border-radius: 10px;
+    transition: background 0.15s, transform 0.1s;
+  }
 
-#control {
-  flex: 2;
-  min-height: 60px;
-}
+  .diff-btn:hover {
+    background: #263249;
+  }
 
-#pause {
-  flex: 1;
-  background: #c4b5fd;
-  color: #2e1065;
-}
+  .diff-btn:active {
+    transform: scale(0.97);
+  }
 
-#hint {
-  min-height: 40px;
-  padding-top: 10px;
-  color: #cbd5e1;
-  text-align: center;
-  font-size: 14px;
-}
+  .diff-btn.easy { border-color: #86efac; color: #86efac; }
+  .diff-btn.normal { border-color: #67e8f9; color: #67e8f9; }
+  .diff-btn.hard { border-color: #fbbf24; color: #fbbf24; }
+  .diff-btn.insane { border-color: #f87171; color: #f87171; }
+  .diff-btn.extreme { border-color: #f0abfc; color: #f0abfc; }
 
-small {
-  display: block;
-  color: #94a3b8;
-  line-height: 1.6;
-  margin-top: 8px;
-}
+  #controls {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #0c1228;
+    flex-shrink: 0;
+    z-index: 10;
+  }
+
+  #control {
+    flex: 2;
+    min-height: 56px;
+    font-size: 16px;
+    font-weight: bold;
+    border: 0;
+    border-radius: 10px;
+    background: #67e8f9;
+    color: #083344;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  #pause {
+    flex: 1;
+    min-height: 56px;
+    font-size: 16px;
+    font-weight: bold;
+    border: 0;
+    border-radius: 10px;
+    background: #c4b5fd;
+    color: #2e1065;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  #hint {
+    padding: 6px 12px;
+    color: #cbd5e1;
+    text-align: center;
+    font-size: 13px;
+    background: #0c1228;
+    flex-shrink: 0;
+    z-index: 10;
+  }
+
+  @media (max-width: 500px) {
+    #hud { font-size: 12px; padding: 6px 8px; }
+    #overlay p { font-size: 13px; }
+    #overlay h2 { font-size: 22px; }
+    #control, #pause { min-height: 50px; font-size: 14px; }
+  }
 </style>
 </head>
-
 <body>
-<div class="wrap">
-  <div class="hud">
+<div id="game-wrap">
+  <div id="hud">
     <span id="form">CUBE</span>
     <span id="percent">0%</span>
     <span id="attempt">Attempt 1</span>
   </div>
 
-  <div class="track">
+  <div id="progress-track">
     <div id="progress"></div>
   </div>
 
-  <div class="arena">
-    <canvas
-      id="game"
-      width="640"
-      height="400"
-      tabindex="0"
-      aria-label="Portal Runner game arena"
-    ></canvas>
+  <div id="arena">
+    <canvas id="game" aria-label="Geometry Dash style runner"></canvas>
 
     <div id="overlay">
-      <h2 id="title">PORTAL RUNNER</h2>
+      <h2 id="title">GEOMETRY DASH</h2>
       <p id="message"></p>
-      <button id="action">Start random map</button>
+      <div id="diff-select"></div>
+      <button id="action" style="display:none"></button>
     </div>
   </div>
 
-  <div class="controls">
+  <div id="controls">
     <button id="control">TAP TO JUMP</button>
     <button id="pause">Pause</button>
   </div>
 
   <div id="hint"></div>
-
-  <small>
-    Touch the arena or use the large control button.<br>
-    Keyboard: Space or ↑. P pauses.<br>
-    Every new run generates a different course.
-  </small>
 </div>
 
 <script>
@@ -186,14 +241,66 @@ const $ = id => document.getElementById(id);
 const canvas = $("game");
 const ctx = canvas.getContext("2d");
 
+// ---------- FIXED LOGICAL RESOLUTION ----------
 const W = 640;
 const H = 400;
 const TOP = 40;
 const FLOOR = 360;
 const PX = 115;
 const R = 12;
-const SPEED = 220;
 const FINISH = 8000;
+
+// ---------- DIFFICULTY SETTINGS ----------
+const DIFFICULTIES = {
+  easy: {
+    label: "EASY", speed: 200,
+    cubeSpacing: [420, 500], cubePlatformW: [90, 120], cubePlatformH: [30, 48],
+    cubeSpikeW: [30, 55], cubeSpikeH: [28, 38], doubleSpikeChance: 0.1,
+    shipGap: [200, 230], shipSpacing: [460, 540], shipSwing: 35,
+    waveGap: [220, 250], waveSpacing: [440, 520], waveSwing: 40,
+    gravity: 1450, jumpForce: -570, shipThrust: 950, shipGravity: 800,
+    shipMaxVy: 240, waveSpeed: 210
+  },
+  normal: {
+    label: "NORMAL", speed: 240,
+    cubeSpacing: [360, 440], cubePlatformW: [70, 100], cubePlatformH: [30, 46],
+    cubeSpikeW: [30, 60], cubeSpikeH: [30, 42], doubleSpikeChance: 0.22,
+    shipGap: [175, 200], shipSpacing: [420, 490], shipSwing: 48,
+    waveGap: [195, 220], waveSpacing: [400, 470], waveSwing: 50,
+    gravity: 1550, jumpForce: -585, shipThrust: 1000, shipGravity: 840,
+    shipMaxVy: 255, waveSpeed: 225
+  },
+  hard: {
+    label: "HARD", speed: 275,
+    cubeSpacing: [310, 380], cubePlatformW: [55, 85], cubePlatformH: [30, 44],
+    cubeSpikeW: [28, 55], cubeSpikeH: [32, 44], doubleSpikeChance: 0.38,
+    shipGap: [150, 175], shipSpacing: [380, 450], shipSwing: 60,
+    waveGap: [170, 195], waveSpacing: [360, 430], waveSwing: 58,
+    gravity: 1650, jumpForce: -600, shipThrust: 1080, shipGravity: 880,
+    shipMaxVy: 270, waveSpeed: 245
+  },
+  insane: {
+    label: "INSANE", speed: 310,
+    cubeSpacing: [280, 340], cubePlatformW: [48, 72], cubePlatformH: [28, 42],
+    cubeSpikeW: [26, 50], cubeSpikeH: [34, 46], doubleSpikeChance: 0.55,
+    shipGap: [130, 155], shipSpacing: [340, 410], shipSwing: 72,
+    waveGap: [150, 175], waveSpacing: [330, 400], waveSwing: 68,
+    gravity: 1750, jumpForce: -615, shipThrust: 1150, shipGravity: 920,
+    shipMaxVy: 285, waveSpeed: 265
+  },
+  extreme: {
+    label: "EXTREME", speed: 350,
+    cubeSpacing: [250, 310], cubePlatformW: [40, 62], cubePlatformH: [26, 40],
+    cubeSpikeW: [24, 45], cubeSpikeH: [36, 48], doubleSpikeChance: 0.75,
+    shipGap: [115, 140], shipSpacing: [310, 370], shipSwing: 85,
+    waveGap: [130, 155], waveSpacing: [300, 360], waveSwing: 78,
+    gravity: 1850, jumpForce: -630, shipThrust: 1220, shipGravity: 960,
+    shipMaxVy: 300, waveSpeed: 285
+  }
+};
+
+let diff = DIFFICULTIES.normal;
+let diffKey = "normal";
 
 const colors = {
   cube: "#86efac",
@@ -201,9 +308,13 @@ const colors = {
   wave: "#f0abfc"
 };
 
+// More portals => more leveling transitions
 const portals = [
-  {x: 2600, mode: "ship"},
-  {x: 5200, mode: "wave"}
+  {x: 1800, mode: "ship"},
+  {x: 3400, mode: "wave"},
+  {x: 4800, mode: "ship"},
+  {x: 6200, mode: "cube"},
+  {x: 7100, mode: "wave"}
 ];
 
 let state = "ready";
@@ -226,6 +337,35 @@ let spikes = [];
 let platforms = [];
 let gates = [];
 
+// ---------- CANVAS SIZING (fill screen, keep aspect) ----------
+function resizeCanvas() {
+  const arena = $("arena");
+  const rect = arena.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+
+  // Fit logical W x H into rect while preserving aspect ratio
+  const scale = Math.min(rect.width / W, rect.height / H);
+  const displayW = W * scale;
+  const displayH = H * scale;
+
+  canvas.width = Math.floor(displayW * dpr);
+  canvas.height = Math.floor(displayH * dpr);
+  canvas.style.width = displayW + "px";
+  canvas.style.height = displayH + "px";
+  canvas.style.margin = "auto";
+  canvas.style.display = "block";
+
+  // Reset transform to map logical coords to the actual canvas
+  ctx.setTransform(
+    (displayW / W) * dpr, 0, 0,
+    (displayH / H) * dpr, 0, 0
+  );
+}
+
+window.addEventListener("resize", resizeCanvas);
+window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 100));
+
+// ---------- UTIL ----------
 function randomBetween(min, max) {
   return min + Math.random() * (max - min);
 }
@@ -235,74 +375,88 @@ function generateMap() {
   platforms = [];
   gates = [];
 
-  // CUBE:
-  // Obstacles are separated to allow landing between jumps.
-  let x = randomBetween(650, 780);
+  const d = diff;
+
+  // ---- CUBE SECTION ----
+  let x = randomBetween(520, 620);
   let previousWasPlatform = false;
 
   while (x < 2300) {
     const makePlatform =
-      !previousWasPlatform && Math.random() < 0.3;
+      !previousWasPlatform && Math.random() < 0.28;
 
     if (makePlatform) {
       platforms.push({
         x,
-        width: randomBetween(85, 115),
-        height: randomBetween(30, 48)
+        width: randomBetween(d.cubePlatformW[0], d.cubePlatformW[1]),
+        height: randomBetween(d.cubePlatformH[0], d.cubePlatformH[1])
       });
     } else {
-      spikes.push({
-        x,
-        width: randomBetween(35, 70),
-        height: randomBetween(30, 42)
-      });
+      const double = Math.random() < d.doubleSpikeChance;
+      if (double) {
+        spikes.push({
+          x,
+          width: randomBetween(d.cubeSpikeW[0], d.cubeSpikeW[1]),
+          height: randomBetween(d.cubeSpikeH[0], d.cubeSpikeH[1])
+        });
+        spikes.push({
+          x: x + randomBetween(38, 55),
+          width: randomBetween(d.cubeSpikeW[0], d.cubeSpikeW[1]),
+          height: randomBetween(d.cubeSpikeH[0], d.cubeSpikeH[1])
+        });
+      } else {
+        spikes.push({
+          x,
+          width: randomBetween(d.cubeSpikeW[0], d.cubeSpikeW[1]),
+          height: randomBetween(d.cubeSpikeH[0], d.cubeSpikeH[1])
+        });
+      }
     }
 
     previousWasPlatform = makePlatform;
-    x += randomBetween(390, 480);
+    x += randomBetween(d.cubeSpacing[0], d.cubeSpacing[1]);
   }
 
-  // SHIP:
-  // Gradual opening-height changes and wide passages.
+  // ---- SHIP SECTION ----
   let center = 200;
   x = randomBetween(3150, 3250);
 
   while (x < 4850) {
     center = Math.max(
-      150,
-      Math.min(250, center + randomBetween(-45, 45))
+      140,
+      Math.min(260, center + randomBetween(-d.shipSwing, d.shipSwing))
     );
-
     gates.push({
       x,
-      width: randomBetween(32, 48),
+      width: randomBetween(34, 50),
       center,
-      gap: randomBetween(200, 220)
+      gap: randomBetween(d.shipGap[0], d.shipGap[1])
     });
-
-    x += randomBetween(440, 510);
+    x += randomBetween(d.shipSpacing[0], d.shipSpacing[1]);
   }
 
-  // WAVE:
-  // Room to zigzag, with changing opening positions.
+  // ---- WAVE SECTION ----
   center = 200;
   x = randomBetween(5700, 5800);
 
   while (x < 7750) {
     center = Math.max(
-      165,
-      Math.min(235, center + randomBetween(-45, 45))
+      155,
+      Math.min(245, center + randomBetween(-d.waveSwing, d.waveSwing))
     );
-
     gates.push({
       x,
-      width: randomBetween(28, 42),
+      width: randomBetween(30, 46),
       center,
-      gap: randomBetween(225, 245)
+      gap: randomBetween(d.waveGap[0], d.waveGap[1])
     });
-
-    x += randomBetween(420, 500);
+    x += randomBetween(d.waveSpacing[0], d.waveSpacing[1]);
   }
+
+  // Extra portal-zone gates
+  gates.push({ x: 1650, width: 40, center: 200, gap: d.shipGap[0] });
+  gates.push({ x: 4650, width: 40, center: 200, gap: d.waveGap[0] });
+  gates.push({ x: 6050, width: 40, center: 200, gap: d.shipGap[0] });
 }
 
 function clearInput() {
@@ -312,10 +466,7 @@ function clearInput() {
 }
 
 function updateUI() {
-  const percent = Math.min(
-    100,
-    Math.floor(world / FINISH * 100)
-  );
+  const percent = Math.min(100, Math.floor(world / FINISH * 100));
 
   $("form").textContent = form.toUpperCase();
   $("form").style.color = colors[form];
@@ -329,15 +480,15 @@ function updateUI() {
   if (form === "cube") {
     $("control").textContent = "TAP TO JUMP";
     $("hint").textContent =
-      "CUBE: tap to jump. Land before jumping again.";
+      "CUBE: tap to jump. " + diff.label + " — precise landings required.";
   } else if (form === "ship") {
     $("control").textContent = "HOLD TO RISE";
     $("hint").textContent =
-      "SHIP: hold to rise, release to descend.";
+      "SHIP: hold to rise, release to descend. Gaps are " + diff.label + " tight!";
   } else {
     $("control").textContent = "HOLD UP · RELEASE DOWN";
     $("hint").textContent =
-      "WAVE: hold to go diagonally up, release to go down.";
+      "WAVE: hold up, release down. " + diff.label + " zigzag.";
   }
 }
 
@@ -346,6 +497,35 @@ function showOverlay(title, message, label, action) {
   $("message").textContent = message;
   $("action").textContent = label;
   $("action").onclick = action;
+  $("action").style.display = "block";
+  $("diff-select").innerHTML = "";
+  $("overlay").classList.remove("hidden");
+}
+
+function showDifficultySelect() {
+  $("title").textContent = "GEOMETRY DASH";
+  $("message").innerHTML =
+    "Select difficulty. Each run generates a new course.<br>" +
+    "<strong style='color:#f87171'>Extreme</strong> is brutally hard.";
+  $("action").style.display = "none";
+
+  const container = $("diff-select");
+  container.innerHTML = "";
+
+  for (const key of ["easy", "normal", "hard", "insane", "extreme"]) {
+    const d = DIFFICULTIES[key];
+    const btn = document.createElement("button");
+    btn.className = "diff-btn " + key;
+    btn.textContent = d.label;
+    btn.onclick = () => {
+      diffKey = key;
+      diff = DIFFICULTIES[key];
+      attempt = 1;
+      start();
+    };
+    container.appendChild(btn);
+  }
+
   $("overlay").classList.remove("hidden");
 }
 
@@ -382,13 +562,12 @@ function retry() {
 }
 
 function burst(x, y, color) {
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 32; i++) {
     const a = Math.random() * Math.PI * 2;
-    const speed = randomBetween(50, 230);
+    const speed = randomBetween(50, 260);
 
     particles.push({
-      x,
-      y,
+      x, y,
       vx: Math.cos(a) * speed,
       vy: Math.sin(a) * speed,
       life: 0.7,
@@ -406,15 +585,14 @@ function die() {
   burst(PX, player.y, colors[form]);
 
   const tip = form === "cube"
-    ? "Jump before the spikes and platform edges."
+    ? "Jump earlier — spikes are " + diff.label + "."
     : form === "ship"
-      ? "Use short holds and releases to adjust your height."
-      : "Alternate holding and releasing before reaching a wall.";
+      ? "Use tiny taps. Big holds will kill you."
+      : "Alternate faster — gaps are " + diff.label + ".";
 
   showOverlay(
     "CRASH!",
-    Math.floor(world / FINISH * 100) +
-      "% complete. " + tip,
+    Math.floor(world / FINISH * 100) + "% complete. " + tip,
     "Try a new random map",
     retry
   );
@@ -426,7 +604,7 @@ function win() {
 
   showOverlay(
     "COURSE COMPLETE!",
-    "You survived all three modes! Ready for a different course?",
+    "You survived all modes on " + diff.label + "! Ready for a different course?",
     "Play a new random map",
     retry
   );
@@ -436,15 +614,8 @@ function togglePause() {
   if (state === "playing") {
     state = "paused";
     clearInput();
-
     $("pause").textContent = "Resume";
-
-    showOverlay(
-      "PAUSED",
-      "Resume keeps your current map.",
-      "Resume",
-      togglePause
-    );
+    showOverlay("PAUSED", "Resume keeps your current map.", "Resume", togglePause);
   } else if (state === "paused") {
     state = "playing";
     $("pause").textContent = "Pause";
@@ -458,33 +629,25 @@ function press() {
   held = true;
 
   if (form === "cube" && player.grounded) {
-    player.vy = -570;
+    player.vy = diff.jumpForce;
     player.grounded = false;
   }
 }
 
 function changeForm(next) {
   form = next;
-
-  // A safe entry position for each flying section.
   player.y = 200;
   player.vy = 0;
   player.grounded = false;
-
   trail = [];
   burst(PX, player.y, colors[form]);
-
   updateUI();
 }
 
 function circleRect(cx, cy, radius, x, y, width, height) {
   const nearestX = Math.max(x, Math.min(x + width, cx));
   const nearestY = Math.max(y, Math.min(y + height, cy));
-
-  return Math.hypot(
-    cx - nearestX,
-    cy - nearestY
-  ) < radius;
+  return Math.hypot(cx - nearestX, cy - nearestY) < radius;
 }
 
 function distanceToSegment(p, a, b) {
@@ -494,10 +657,7 @@ function distanceToSegment(p, a, b) {
 
   const t = squared === 0 ? 0 : Math.max(
     0,
-    Math.min(
-      1,
-      ((p.x - a.x) * dx + (p.y - a.y) * dy) / squared
-    )
+    Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / squared)
   );
 
   return Math.hypot(
@@ -510,14 +670,8 @@ function spikeHit(spike) {
   const x = spike.x - world + PX;
 
   const a = {x, y: FLOOR};
-  const b = {
-    x: x + spike.width / 2,
-    y: FLOOR - spike.height
-  };
-  const c = {
-    x: x + spike.width,
-    y: FLOOR
-  };
+  const b = {x: x + spike.width / 2, y: FLOOR - spike.height};
+  const c = {x: x + spike.width, y: FLOOR};
 
   const p = {x: PX, y: player.y};
 
@@ -551,17 +705,13 @@ function update(dt) {
     p.x += p.vx * dt;
     p.y += p.vy * dt;
   }
-
   particles = particles.filter(p => p.life > 0);
 
   if (state !== "playing") return;
 
-  world += SPEED * dt;
+  world += diff.speed * dt;
 
-  if (
-    portalIndex < portals.length &&
-    world >= portals[portalIndex].x
-  ) {
+  if (portalIndex < portals.length && world >= portals[portalIndex].x) {
     changeForm(portals[portalIndex].mode);
     portalIndex += 1;
   }
@@ -569,7 +719,7 @@ function update(dt) {
   const oldY = player.y;
 
   if (form === "cube") {
-    player.vy += 1500 * dt;
+    player.vy += diff.gravity * dt;
     player.y += player.vy * dt;
     player.grounded = false;
 
@@ -577,10 +727,7 @@ function update(dt) {
       const x = platform.x - world + PX;
       const top = FLOOR - platform.height;
 
-      const overlapsX =
-        PX + R > x &&
-        PX - R < x + platform.width;
-
+      const overlapsX = PX + R > x && PX - R < x + platform.width;
       const landing =
         overlapsX &&
         player.vy >= 0 &&
@@ -592,15 +739,7 @@ function update(dt) {
         player.vy = 0;
         player.grounded = true;
       } else if (
-        circleRect(
-          PX,
-          player.y,
-          R - 2,
-          x,
-          top,
-          platform.width,
-          platform.height
-        )
+        circleRect(PX, player.y, R - 2, x, top, platform.width, platform.height)
       ) {
         die();
         return;
@@ -626,25 +765,17 @@ function update(dt) {
       }
     }
   } else if (form === "ship") {
-    player.vy += (held ? -1050 : 850) * dt;
-    player.vy = Math.max(-270, Math.min(270, player.vy));
+    player.vy += (held ? -diff.shipThrust : diff.shipGravity) * dt;
+    player.vy = Math.max(-diff.shipMaxVy, Math.min(diff.shipMaxVy, player.vy));
     player.y += player.vy * dt;
-
     angle = player.vy / 650;
   } else {
-    player.vy = held ? -230 : 230;
+    player.vy = held ? -diff.waveSpeed : diff.waveSpeed;
     player.y += player.vy * dt;
-
     angle = held ? -Math.PI / 4 : Math.PI / 4;
   }
 
-  if (
-    form !== "cube" &&
-    (
-      player.y - R <= TOP ||
-      player.y + R >= FLOOR
-    )
-  ) {
+  if (form !== "cube" && (player.y - R <= TOP || player.y + R >= FLOOR)) {
     die();
     return;
   }
@@ -654,25 +785,8 @@ function update(dt) {
     const openingTop = gate.center - gate.gap / 2;
     const openingBottom = gate.center + gate.gap / 2;
 
-    const hitTop = circleRect(
-      PX,
-      player.y,
-      R - 2,
-      x,
-      TOP,
-      gate.width,
-      openingTop - TOP
-    );
-
-    const hitBottom = circleRect(
-      PX,
-      player.y,
-      R - 2,
-      x,
-      openingBottom,
-      gate.width,
-      FLOOR - openingBottom
-    );
+    const hitTop = circleRect(PX, player.y, R - 2, x, TOP, gate.width, openingTop - TOP);
+    const hitBottom = circleRect(PX, player.y, R - 2, x, openingBottom, gate.width, FLOOR - openingBottom);
 
     if (hitTop || hitBottom) {
       die();
@@ -681,16 +795,10 @@ function update(dt) {
   }
 
   for (const t of trail) {
-    t.x -= SPEED * dt;
+    t.x -= diff.speed * dt;
     t.life -= dt;
   }
-
-  trail.push({
-    x: PX,
-    y: player.y,
-    life: 0.45
-  });
-
+  trail.push({x: PX, y: player.y, life: 0.45});
   trail = trail.filter(t => t.life > 0);
 
   updateUI();
@@ -703,6 +811,7 @@ function draw() {
 
   const offset = (world * 0.5) % 40;
 
+  // Grid
   ctx.strokeStyle = "#1b2542";
   ctx.lineWidth = 1;
 
@@ -720,6 +829,7 @@ function draw() {
     ctx.stroke();
   }
 
+  // Top / bottom bars
   ctx.fillStyle = "#172039";
   ctx.fillRect(0, 0, W, TOP);
   ctx.fillRect(0, FLOOR, W, H - FLOOR);
@@ -734,33 +844,22 @@ function draw() {
     ctx.stroke();
   }
 
+  // Platforms
   for (const platform of platforms) {
     const x = platform.x - world + PX;
-
     if (x > W || x + platform.width < 0) continue;
 
     ctx.fillStyle = "#14532d";
     ctx.strokeStyle = "#86efac";
     ctx.lineWidth = 2;
 
-    ctx.fillRect(
-      x,
-      FLOOR - platform.height,
-      platform.width,
-      platform.height
-    );
-
-    ctx.strokeRect(
-      x,
-      FLOOR - platform.height,
-      platform.width,
-      platform.height
-    );
+    ctx.fillRect(x, FLOOR - platform.height, platform.width, platform.height);
+    ctx.strokeRect(x, FLOOR - platform.height, platform.width, platform.height);
   }
 
+  // Spikes
   for (const spike of spikes) {
     const x = spike.x - world + PX;
-
     if (x > W || x + spike.width < 0) continue;
 
     ctx.fillStyle = "#9f1239";
@@ -769,10 +868,7 @@ function draw() {
 
     ctx.beginPath();
     ctx.moveTo(x, FLOOR);
-    ctx.lineTo(
-      x + spike.width / 2,
-      FLOOR - spike.height
-    );
+    ctx.lineTo(x + spike.width / 2, FLOOR - spike.height);
     ctx.lineTo(x + spike.width, FLOOR);
     ctx.closePath();
 
@@ -780,9 +876,9 @@ function draw() {
     ctx.stroke();
   }
 
+  // Gates
   for (const gate of gates) {
     const x = gate.x - world + PX;
-
     if (x > W || x + gate.width < 0) continue;
 
     const openingTop = gate.center - gate.gap / 2;
@@ -792,106 +888,64 @@ function draw() {
     ctx.strokeStyle = "#f0abfc";
     ctx.lineWidth = 2;
 
-    ctx.fillRect(
-      x,
-      TOP,
-      gate.width,
-      openingTop - TOP
-    );
+    ctx.fillRect(x, TOP, gate.width, openingTop - TOP);
+    ctx.strokeRect(x, TOP, gate.width, openingTop - TOP);
 
-    ctx.strokeRect(
-      x,
-      TOP,
-      gate.width,
-      openingTop - TOP
-    );
-
-    ctx.fillRect(
-      x,
-      openingBottom,
-      gate.width,
-      FLOOR - openingBottom
-    );
-
-    ctx.strokeRect(
-      x,
-      openingBottom,
-      gate.width,
-      FLOOR - openingBottom
-    );
+    ctx.fillRect(x, openingBottom, gate.width, FLOOR - openingBottom);
+    ctx.strokeRect(x, openingBottom, gate.width, FLOOR - openingBottom);
   }
 
+  // Portals
   for (const portal of portals) {
     const x = portal.x - world + PX;
-
     if (x < -50 || x > W + 50) continue;
 
     ctx.save();
-
     ctx.strokeStyle = colors[portal.mode];
     ctx.shadowColor = colors[portal.mode];
-    ctx.shadowBlur = 20;
+    ctx.shadowBlur = 22;
     ctx.lineWidth = 6;
 
     ctx.beginPath();
-    ctx.ellipse(
-      x, 200,
-      20, 128,
-      0, 0, Math.PI * 2
-    );
+    ctx.ellipse(x, 200, 20, 128, 0, 0, Math.PI * 2);
     ctx.stroke();
-
     ctx.restore();
 
     ctx.fillStyle = colors[portal.mode];
     ctx.font = "bold 16px system-ui";
     ctx.textAlign = "center";
-
-    ctx.fillText(
-      portal.mode.toUpperCase(),
-      x,
-      60
-    );
+    ctx.fillText(portal.mode.toUpperCase(), x, 60);
   }
 
+  // Finish line
   const finishX = FINISH - world + PX;
-
   if (finishX >= 0 && finishX <= W) {
     ctx.fillStyle = "#facc15";
-    ctx.fillRect(
-      finishX,
-      TOP,
-      5,
-      FLOOR - TOP
-    );
+    ctx.fillRect(finishX, TOP, 5, FLOOR - TOP);
 
     ctx.font = "bold 16px system-ui";
     ctx.textAlign = "right";
     ctx.fillText("FINISH", finishX - 8, 65);
   }
 
+  // Trail
   ctx.strokeStyle = colors[form];
   ctx.lineWidth = form === "wave" ? 4 : 2;
 
   if (trail.length > 1) {
     ctx.globalAlpha = 0.45;
     ctx.beginPath();
-
     trail.forEach((t, index) => {
-      if (index === 0) {
-        ctx.moveTo(t.x, t.y);
-      } else {
-        ctx.lineTo(t.x, t.y);
-      }
+      if (index === 0) ctx.moveTo(t.x, t.y);
+      else ctx.lineTo(t.x, t.y);
     });
-
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
 
+  // Player
   if (player && state !== "over") {
     ctx.save();
-
     ctx.translate(PX, player.y);
     ctx.rotate(angle);
 
@@ -901,10 +955,8 @@ function draw() {
 
     if (form === "cube") {
       ctx.fillRect(-R, -R, R * 2, R * 2);
-
       ctx.shadowBlur = 0;
       ctx.fillStyle = "#14532d";
-
       ctx.fillRect(1, -6, 5, 5);
       ctx.fillRect(-6, -6, 4, 5);
     } else if (form === "ship") {
@@ -918,13 +970,7 @@ function draw() {
 
       ctx.shadowBlur = 0;
       ctx.fillStyle = "#fb923c";
-
-      ctx.fillRect(
-        -22,
-        -4,
-        10 + Math.random() * 8,
-        8
-      );
+      ctx.fillRect(-22, -4, 10 + Math.random() * 8, 8);
     } else {
       ctx.beginPath();
       ctx.moveTo(18, 0);
@@ -938,12 +984,12 @@ function draw() {
     ctx.restore();
   }
 
+  // Particles
   for (const p of particles) {
     ctx.globalAlpha = Math.max(0, p.life / 0.7);
     ctx.fillStyle = p.color;
     ctx.fillRect(p.x, p.y, 4, 4);
   }
-
   ctx.globalAlpha = 1;
 }
 
@@ -960,7 +1006,6 @@ function attachTouch(element) {
 
     activePointer = event.pointerId;
     element.setPointerCapture(event.pointerId);
-
     press();
   });
 
@@ -974,46 +1019,27 @@ function attachTouch(element) {
   element.addEventListener("pointerup", release);
   element.addEventListener("pointercancel", release);
   element.addEventListener("lostpointercapture", release);
-
-  element.addEventListener("contextmenu", event => {
-    event.preventDefault();
-  });
+  element.addEventListener("contextmenu", event => event.preventDefault());
 }
 
 attachTouch(canvas);
 attachTouch($("control"));
 
 window.addEventListener("keydown", event => {
-  if (
-    event.code === "Space" ||
-    event.code === "ArrowUp"
-  ) {
+  if (event.code === "Space" || event.code === "ArrowUp") {
     event.preventDefault();
-
-    if (
-      !event.repeat &&
-      !keyHeld &&
-      activePointer === null &&
-      state === "playing"
-    ) {
+    if (!event.repeat && !keyHeld && activePointer === null && state === "playing") {
       keyHeld = true;
       press();
     }
   }
-
   if (event.code === "KeyP" && !event.repeat) {
     togglePause();
   }
 });
 
 window.addEventListener("keyup", event => {
-  if (
-    (
-      event.code === "Space" ||
-      event.code === "ArrowUp"
-    ) &&
-    keyHeld
-  ) {
+  if ((event.code === "Space" || event.code === "ArrowUp") && keyHeld) {
     keyHeld = false;
     held = false;
   }
@@ -1032,31 +1058,18 @@ document.addEventListener("visibilitychange", () => {
 
 $("pause").onclick = togglePause;
 
+// ---------- BOOT ----------
+resizeCanvas();
 updateUI();
-
-showOverlay(
-  "PORTAL RUNNER",
-  "Cube: tap to jump. Ship: hold to rise. Wave: hold up, release down. Every run creates a new course!",
-  "Start random map",
-  start
-);
+showDifficultySelect();
 
 let previous = performance.now();
 
 function frame(now) {
-  const elapsed = Math.min(
-    (now - previous) / 1000,
-    0.05
-  );
-
+  const elapsed = Math.min((now - previous) / 1000, 0.05);
   previous = now;
 
-  // Small physics steps help prevent missed collisions.
-  const steps = Math.max(
-    1,
-    Math.ceil(elapsed / 0.008)
-  );
-
+  const steps = Math.max(1, Math.ceil(elapsed / 0.008));
   const dt = elapsed / steps;
 
   for (let i = 0; i < steps; i++) {
